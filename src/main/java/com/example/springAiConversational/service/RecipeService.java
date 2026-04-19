@@ -37,7 +37,16 @@ public class RecipeService {
                     .call()
                     .content();
             response = cleanJson(response);
-            return mapper.readTree(response);
+            try {
+                return mapper.readTree(response);
+            } catch (Exception e) {
+                System.out.println("RAW AI RESPONSE: " + response); // 🔥 debug log
+
+                return Map.of(
+                        "error", "Invalid AI response",
+                        "raw_response", response
+                );
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -80,29 +89,70 @@ public class RecipeService {
 //%s
 //""".formatted(userRequest, budget, people, people, productList.toString());
 //    }
-private String buildPrompt(String userRequest, List<Product> products, int budget, int people) {
+//
+//private String buildPrompt(String userRequest, List<Product> products, int budget, int people) {
+//
+//    StringBuilder productList = new StringBuilder();
+//
+//    int limit = Math.min(products.size(), 25);
+//
+//    for (int i = 0; i < limit; i++) {
+//        Product p = products.get(i);
+//
+//        productList.append("- ")
+//                .append(p.name)
+//                .append(" ₹")
+//                .append(p.price)
+//                .append(" per ")
+//                .append(p.unit)
+//                .append("\n");
+//    }
+//
+//    String budgetInstruction = (budget > 0)
+//            ? "- Budget: " + budget + " INR\n- Stay within budget"
+//            : "- No strict budget. Focus on sufficient quantity for all people";
+//
+//    return """
+//User request:
+//%s
+//
+//Derived constraints:
+//%s
+//- People: %d
+//
+//Instructions:
+//- Ensure enough food for %d people
+//- Do NOT reduce quantity due to budget if not provided
+//- Use realistic ingredient quantities
+//
+//Available products (STRICT - use only these):
+//%s
+//""".formatted(userRequest, budgetInstruction, people, people, productList.toString());
+//}
 
-    StringBuilder productList = new StringBuilder();
+    private String buildPrompt(String userRequest, List<Product> products, int budget, int people) {
 
-    int limit = Math.min(products.size(), 25);
+        StringBuilder productList = new StringBuilder();
 
-    for (int i = 0; i < limit; i++) {
-        Product p = products.get(i);
+        int limit = Math.min(products.size(), 25);
 
-        productList.append("- ")
-                .append(p.name)
-                .append(" ₹")
-                .append(p.price)
-                .append(" per ")
-                .append(p.unit)
-                .append("\n");
-    }
+        for (int i = 0; i < limit; i++) {
+            Product p = products.get(i);
 
-    String budgetInstruction = (budget > 0)
-            ? "- Budget: " + budget + " INR\n- Stay within budget"
-            : "- No strict budget. Focus on sufficient quantity for all people";
+            productList.append("- ")
+                    .append(p.name)
+                    .append(" ₹")
+                    .append(p.price)
+                    .append(" per ")
+                    .append(p.unit)
+                    .append("\n");
+        }
 
-    return """
+        String budgetInstruction = (budget > 0)
+                ? "- Budget: " + budget + " INR\n- Stay within budget"
+                : "- No strict budget. Focus on sufficient quantity for all people";
+
+        return """
 User request:
 %s
 
@@ -118,7 +168,7 @@ Instructions:
 Available products (STRICT - use only these):
 %s
 """.formatted(userRequest, budgetInstruction, people, people, productList.toString());
-}
+    }
 
     // 🔥 Extract budget like "150", "150rs"
     private int extractBudget(String text) {
@@ -152,9 +202,11 @@ Available products (STRICT - use only these):
     private String cleanJson(String response) {
         if (response == null) return "";
 
-        // remove ```json and ```
         response = response.replaceAll("```json", "");
         response = response.replaceAll("```", "");
+
+        // remove weird symbols that break JSON
+        response = response.replaceAll("[?]", "");
 
         return response.trim();
     }
